@@ -1,0 +1,8 @@
+# Ignore the build directory
+build/
+
+# Ignore generated documentation
+docs/
+
+# Auto-generated compile commands
+compile_commands.json
