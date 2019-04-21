@@ -1,7 +1,7 @@
 MAKEFILE_PATH := $(lastword $(MAKEFILE_LIST))
 BASE_DIR := $(dir $(MAKEFILE_PATH))
 BASE_DIR := $(BASE_DIR:%/=%)
-SOURCE_DIR := $(BASE_DIR)/shoutout
+SOURCE_DIR := $(BASE_DIR)/finalexam
 BUILD_DIR := $(BASE_DIR)/build
 
 SRCS := $(shell find "$(SOURCE_DIR)" \( -iname '*.cc' -and -not -iname '*_test.cc' \) | sort)

@@ -3,28 +3,16 @@
 #pragma once
 
 #include <algorithm>
-#include <chrono>  // NOLINT(build/c++11)
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <string>
 #include <vector>
 
+using float80_t = long double;
+
 namespace mjohnson {
 namespace common {
-/**
- * A list of characters forbidden from being used in filesystem object names.
- * This is used to create filesystem-friendly user IDs.
- */
-const std::vector<char> kFilesystemForbiddenCharacters =
-    []() -> std::vector<char> {
-  std::string temporaryForbiddenCharacters = "/?<>\\:*|\"^";
-  std::sort(temporaryForbiddenCharacters.begin(),
-            temporaryForbiddenCharacters.end());
-  std::vector<char> forbiddenCharactersVector(
-      temporaryForbiddenCharacters.begin(), temporaryForbiddenCharacters.end());
-  return forbiddenCharactersVector;
-}();
-
 /**
  * Clears the trailing whitespace after a read from cin.
  */
@@ -34,6 +22,36 @@ void ClearInputWhitespace();
  * Clears invalid input form cin and resets the error flags.
  */
 void ClearInvalidInput();
+
+/**
+ * Clears the terminal screen.
+ */
+void ClearScreen();
+
+/**
+ * Pauses the program and waits for the user.
+ */
+void Pause();
+
+/**
+ * Calculates Pi to a high degree of accuracy.
+ * @return Pi to a high degree of accuracy.
+ */
+const float80_t PI = std::atanl(1.0L) * 4.0L;
+
+/**
+ * Converts degrees to radians.
+ * @param degrees The angle in degrees.
+ * @return The angle in radians.
+ */
+float80_t DegreesToRadians(float80_t degrees);
+
+/**
+ * Converts degrees to radians.
+ * @param degrees The angle in degrees.
+ * @return The angle in radians.
+ */
+float80_t RadiansToDegrees(float80_t radians);
 
 /**
  * Requests input from the user using a specified prompt and validator. The
@@ -95,6 +113,15 @@ std::string RequestInput<std::string>(
     const std::string& prompt,
     const std::function<bool(std::string)>& validator);
 
+template <>
+float80_t RequestInput<float80_t>(
+    const std::string& prompt, const std::function<bool(float80_t)>& validator);
+
+// RequestContinue prompts the user to ask if they would like to continue the
+// program. It continuously re-prompts on invalid input. Once valid input is
+// received, it returns the result.
+bool RequestContinue();
+
 bool ValidateStringNotEmpty(const std::string& message, const std::string& str);
 
 bool IsDigits(const std::string& str);
@@ -110,12 +137,5 @@ void TrimString(std::string* str);
  * @param str A pointer to the string to convert to lowercase.
  */
 void LowerString(std::string* str);
-
-/**
- * Creates a friendly time string for a given system clock time point.
- * @param  time The time point to create a time string for.
- * @return      The friendly time string.
- */
-std::string FriendlyTime(std::chrono::system_clock::time_point time);
 }  // namespace common
 }  // namespace mjohnson

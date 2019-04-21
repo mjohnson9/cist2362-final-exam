@@ -1,9 +1,9 @@
 // Copyright 2019 Michael Johnson
 
-#include "shoutout/common.h"
+#include "finalexam/common.h"
 
 #include <algorithm>
-#include <chrono>  // NOLINT(build/c++11)
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -36,6 +36,54 @@ std::string RequestInput<std::string>(
   return response;
 }
 
+bool ValidateInputIsDigits(std::string input);
+
+template <>
+float80_t RequestInput<float80_t>(
+    const std::string& prompt,
+    const std::function<bool(float80_t)>& validator) {
+  while (true) {  // Create an infinite loop that we'll exit by returning
+    auto input = RequestInput<std::string>(prompt, ValidateInputIsDigits);
+
+    float80_t input_number;
+    try {
+      input_number = std::stold(input);
+    } catch (const std::invalid_argument& ex) {
+      std::cout << std::endl
+                << "ERROR: The value you gave is not a valid decimal number."
+                << std::endl
+                << std::endl;
+      continue;
+    } catch (const std::out_of_range& ex) {
+      std::cout << std::endl
+                << "ERROR: The value you gave is outside of the representable "
+                   "range. Please enter a smaller value."
+                << std::endl
+                << std::endl;
+      continue;
+    }
+
+    if (!validator(input_number)) {
+      continue;
+    }
+
+    return input_number;
+  }
+}
+
+bool ValidateInputIsDigits(std::string input) {
+  TrimString(&input);
+
+  if (!IsDigits(input)) {
+    std::cout << std::endl
+              << "ERROR: You must input only digits." << std::endl
+              << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
 void ClearInputWhitespace() {
   char c = static_cast<char>(std::cin.peek());
   if (std::isspace(c) == 0) {
@@ -50,6 +98,86 @@ void ClearInvalidInput() {
   std::cin.ignore(std::numeric_limits<std::streamsize>::max(),
                   '\n');  // Ignore all of the user input currently in the
                           // buffer up to the next new line.
+}
+
+// ValidateContinueResponse is a validation function for RequestInput. It
+// validates that a response to the continue question can be used.
+bool ValidateContinueResponse(const std::string& response);
+
+bool RequestContinue() {
+  while (true) {
+    auto response = RequestInput<std::string>(
+        "Would you like to run the program again? [y/N] ",
+        ValidateContinueResponse);
+    if (response.empty()) {
+      return false;  // The default option is to not continue
+    }
+
+    // Lowercase the response to make it easier to compare
+    std::transform(response.begin(), response.end(), response.begin(),
+                   ::tolower);
+    if (response == "y" || response == "yes") {
+      return true;
+    }
+    if (response == "n" || response == "no") {
+      return false;
+    }
+
+    // We should never reach this point
+    throw std::invalid_argument("response");
+  }
+}
+
+bool ValidateContinueResponse(const std::string& response) {
+  if (response.empty()) {
+    // Shortcut; we allow empty responses
+    return true;
+  }
+
+  std::string modified_response = response;  // Copy the response string
+
+  // Lowercase the response to make it easier to compare
+  std::transform(modified_response.begin(), modified_response.end(),
+                 modified_response.begin(), ::tolower);
+
+  const bool is_valid =
+      (modified_response == "y" || modified_response == "yes" ||
+       modified_response == "n" || modified_response == "no");
+  if (!is_valid) {
+    std::cout << response
+              << " is an invalid response. Available responses are yes, y, "
+                 "no, or n."
+              << std::endl
+              << std::endl;
+  }
+
+  return is_valid;
+}
+
+void ClearScreen() {
+  // It feels nasty forking a process to clear the screen, but it's a better
+  // alternative to including something like ncurses
+#if defined(_WIN32) || defined(_WIN64)
+  system("CLS");
+#elif defined(unix) || defined(__unix__) || defined(__unix) || \
+    (defined(__APPLE__) && defined(__MACH__))
+  system("clear");
+#else
+#error "Operating system not supported"
+#endif  // End of OS detection
+}
+
+void Pause() {
+  // Wait for a line of input and ignore the result.
+  RequestInput<std::string>("Press enter to continue.", nullptr);
+}
+
+float80_t DegreesToRadians(float80_t degrees) {
+  return (degrees * PI / 180.0L);
+}
+
+float80_t RadiansToDegrees(float80_t radians) {
+  return (radians * 180.0L / PI);
 }
 
 bool ValidateStringNotEmpty(const std::string& message,
@@ -81,7 +209,22 @@ void LowerString(std::string* str) {
 }
 
 bool IsDigits(const std::string& str) {
+  bool first = true;
+  bool had_decimal = false;
+
   for (const char c : str) {
+    if (first) {
+      first = false;
+      if (c == '-') {
+        // negative is allowed as the first character
+        continue;
+      }
+    }
+    if (c == '.' && !had_decimal) {
+      // One decimal point is allowed
+      had_decimal = true;
+      continue;
+    }
     if (std::isdigit(c) == 0) {
       return false;
     }
@@ -89,46 +232,5 @@ bool IsDigits(const std::string& str) {
 
   return true;
 }
-
-std::string FriendlyTime(std::chrono::system_clock::time_point time) {
-  auto current = std::chrono::system_clock::now();
-  auto ago = current - time;
-  if (ago < std::chrono::minutes(2)) {
-    return "right now";
-  }
-  if (ago < std::chrono::hours(1)) {
-    auto minutes = std::chrono::duration_cast<std::chrono::minutes>(ago);
-    return std::to_string(minutes.count()) + " minutes ago";
-  }
-  if (ago < std::chrono::hours(24)) {
-    auto hours = std::chrono::duration_cast<std::chrono::hours>(ago);
-    return std::to_string(hours.count()) + " hours ago";
-  }
-
-  const time_t c_time_current = std::chrono::system_clock::to_time_t(current);
-  std::tm current_localtime = *std::localtime(&c_time_current);
-  // Copy so that we're not using the internal static pointer from localtime
-  current_localtime = std::tm(current_localtime);
-
-  const time_t c_time = std::chrono::system_clock::to_time_t(time);
-  std::tm* localtime = std::localtime(&c_time);
-
-  const char* time_format;
-  if (ago < std::chrono::hours(24 * 7)) {
-    time_format = static_cast<const char*>("%a %I:%M");
-  } else if (localtime->tm_year == current_localtime.tm_year) {
-    time_format = static_cast<const char*>("%b %d %I:%M");
-  } else {
-    time_format = static_cast<const char*>("%b %d %Y %I:%M");
-  }
-
-  const size_t kBufSize = 512;
-  char* buf = new char[kBufSize];
-  size_t len = strftime(buf, kBufSize, time_format, localtime);
-
-  const std::string formatted_time(buf, len);
-
-  return formatted_time;
-}  // namespace common
 }  // namespace common
 }  // namespace mjohnson
